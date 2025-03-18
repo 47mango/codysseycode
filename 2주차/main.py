@@ -48,7 +48,8 @@ try:
         for row in danger_flam:
             file.write(",".join(map(str, row)) + "\n")
 
-    # 바이너리 파일로 데이터 저장
+
+    #--------------------------------------- 추가 문제 부분 : 바이너리 파일로 데이터 저장 --------------------------------------------
     with open(result_bin, 'wb') as file:
         for row in danger_flam:
             line = ",".join(map(str, row)) + "\n"  # 리스트를 문자열로 변환
