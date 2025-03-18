@@ -3,6 +3,7 @@ print('Hello Mars')
 #파일 경로
 file_path = 'D:/study/codysseycode/1주차/mission_computer_main.log'
 
+output_file = "last_3_lines.log"
 
 try:
  # 파일열어서 한줄씩 읽기
@@ -10,12 +11,18 @@ try:
   lines = f.readlines()
 
   # 리스트 정상 출력
-  # for line in lines:
-  #     print(line.strip())
+  #for line in lines:
+   #print(line.strip())
+
+  last_lines = lines[-3:]  # 마지막 3줄 추출
 
   # 리스트를 거꾸로 뒤집어 출력
   for line in reversed(lines):  
    print(line.strip())
+
+ # 새로운 파일 생성 및 저장
+ with open(output_file, "w", encoding="utf-8") as f:
+  f.writelines(last_lines)
 
 #파일 찾을수 없을때
 except FileNotFoundError:
