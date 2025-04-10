@@ -7,6 +7,7 @@ class MissionComputer:
     def __init__(self):
         self.settings = self.load_settings()
 
+    #필요한 미션 컴퓨터의 시스템 정보
     def load_settings(self):
         default_settings = {
             "운영체제": True,
@@ -17,6 +18,7 @@ class MissionComputer:
             "CPU 실시간 사용량(%)": True,
             "메모리 실시간 사용량(%)": True
         }
+        #추가문제 출력 정보의 항목을 세팅 가능
         if not os.path.exists("./5주차/setting.txt"):
             with open("./5주차/setting.txt", "w", encoding="utf-8") as f:
                 json.dump(default_settings, f, indent=4, ensure_ascii=False)
@@ -25,6 +27,7 @@ class MissionComputer:
             with open("./5주차/setting.txt", "r", encoding="utf-8") as f:
                 return json.load(f)
 
+    #가져온 시스템 정보를 JSON 형식으로 출력하는 코드를 포함한다. 
     def get_mission_computer_info(self):
         info = {}
         if self.settings.get("운영체제", False):
@@ -40,6 +43,7 @@ class MissionComputer:
 
         return json.dumps(info, indent=4, ensure_ascii=False)
 
+    # CPU, 메모리 정보 가져오기
     def get_mission_computer_load(self):
         load = {}
         if self.settings.get("CPU 실시간 사용량(%)", False):
@@ -50,6 +54,7 @@ class MissionComputer:
         return json.dumps(load, indent=4, ensure_ascii=False)
 
 
+#인스턴스 제작
 if __name__ == "__main__":
     runComputer = MissionComputer()
 
