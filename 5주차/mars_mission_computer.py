@@ -30,17 +30,20 @@ class MissionComputer:
     #가져온 시스템 정보를 JSON 형식으로 출력하는 코드를 포함한다. 
     def get_mission_computer_info(self):
         info = {}
-        if self.settings.get("운영체제", False):
-            info["운영체제"] = platform.system()
-        if self.settings.get("운영체제 버전", False):
-            info["운영체제 버전"] = platform.version()
-        if self.settings.get("CPU 타입", False):
-            info["CPU 타입"] = platform.processor()
-        if self.settings.get("CPU 코어 수", False):
-            info["CPU 코어 수"] = psutil.cpu_count(logical=False)
-        if self.settings.get("메모리 크기(GB)", False):
-            info["메모리 크기(GB)"] = round(psutil.virtual_memory().total / (1024 ** 3), 2)
-
+        try:
+            if self.settings.get("운영체제", False):
+                info["운영체제"] = platform.system()
+            if self.settings.get("운영체제 버전", False):
+                info["운영체제 버전"] = platform.version()
+            if self.settings.get("CPU 타입", False):
+                info["CPU 타입"] = platform.processor()
+            if self.settings.get("CPU 코어 수", False):
+                info["CPU 코어 수"] = psutil.cpu_count(logical=False)
+            if self.settings.get("메모리 크기(GB)", False):
+                info["메모리 크기(GB)"] = round(psutil.virtual_memory().total / (1024 ** 3), 2)
+                
+        except Exception as e:
+            info["오류"] = f"시스템 정보를 가져오는 중 오류 발생: {str(e)}"
         return json.dumps(info, indent=4, ensure_ascii=False)
 
     # CPU, 메모리 정보 가져오기
