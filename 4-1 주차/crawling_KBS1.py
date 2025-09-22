@@ -15,9 +15,9 @@ crawling_KBS.py
 DevTools로 셀렉터 찾는 팁 (KBS 헤드라인)
 1) 브라우저에서 https://news.kbs.co.kr 접속
 2) 헤드라인 영역의 기사 제목 텍스트를 우클릭 → '검사(Inspect)'
-3) <a> 링크(기사 제목)를 감싼 요소의 "고유한" CSS 셀렉터를 복사(Copy selector)
-4) 아래 SELECTOR_HEADLINES 에 붙여 넣고 실행
-   (예: 'section.headline a.tit', 'div#headline a', 사이트 구조에 따라 다릅니다)
+3) <a> 또는 <p> 등 제목을 담는 요소의 "고유한" CSS 셀렉터를 복사(Copy selector)
+4) 아래 SELECTOR_HEADLINES 또는 --selector 옵션에 붙여 넣고 실행
+   (예: 'section.headline p', 'div#headline p', 사이트 구조에 따라 다릅니다)
 
 주의
 - 실제 뉴스 사이트는 구조와 셀렉터가 자주 바뀝니다. 아래 코드는 기본/폴백 셀렉터를 여러 개 시도합니다.
@@ -45,7 +45,7 @@ HEADERS = {
 }
 
 def _clean_text(s: str) -> str:
-    return re.sub(r"\s+", " ", s).strip()
+    return re.sub(r"\\s+", " ", s).strip()
 
 
 # -----------------------------
@@ -54,21 +54,28 @@ def _clean_text(s: str) -> str:
 
 # DevTools에서 확인 후 이 값을 본인 환경에 맞게 업데이트하세요.
 # 예시 후보들을 아래 DEFAULT_FALLBACK_SELECTORS 에서 순차 시도합니다.
-SELECTOR_HEADLINES: Optional[str] = "contents > div.box.head-line.main-head-line.main-page-head-line > div > div.main-news-wrapper > a > div.txt-wrapper > p.title"
+SELECTOR_HEADLINES: Optional[str] = "#contents > div.box.head-line.main-head-line.main-page-head-line > div > div.main-news-wrapper > a > div.txt-wrapper > p.news-txt"
 
 # 사이트 구조 변화에 대비한 폴백 셀렉터 후보들(필요할 때 추가/수정)
+# p 태그를 우선 시도하고, 혹시 a 태그로 구조가 돌아갈 경우를 대비해 보조 폴백도 포함
 DEFAULT_FALLBACK_SELECTORS: List[str] = [
-    "section.headline a",          # 예시: 섹션에 headline 클래스가 있을 경우
-    "#headline a",                 # 예시: id가 headline인 컨테이너
+    "section.headline p",          # 예시: 섹션에 headline 클래스가 있을 경우
+    "#headline p",                 # 예시: id가 headline인 컨테이너
+    "div.headline p",
+    "ul#headline p",
+    "div.top-news p",
+    "p.headline",                  # 제목 자체가 <p class='headline'>인 경우
+    ".headline p",
+    "h2, h3, p",                   # 제목이 h2/h3/p로 섞여 있는 경우(포괄)
+
+    # 아래는 보조 폴백(기존 a 태그 기반) - 혹시 페이지 구조가 a로 돌아갈 경우 대비
+    "section.headline a",
+    "#headline a",
     "div.headline a",
-    "ul#headline a",
-    "div.top-news a",
-    "a.headline",                  # 제목 링크 자체에 headline 클래스가 붙은 경우
-    "dt a",                        # 일부 포털형 리스트
-    "h2 a, h3 a"                   # 제목이 h2/h3로 마크업된 경우
+    "a.headline",
 ]
 
-def fetch_kbs_headlines(limit: int = 10, url: str = "https://news.kbs.co.kr") -> List[str]:
+def fetch_kbs_headlines(limit: int = 10, url: str = "https://news.kbs.co.kr", selector: Optional[str] = None) -> List[str]:
     """KBS 메인에서 헤드라인 텍스트를 수집하여 리스트로 반환."""
     try:
         res = requests.get(url, headers=HEADERS, timeout=10)
@@ -79,15 +86,17 @@ def fetch_kbs_headlines(limit: int = 10, url: str = "https://news.kbs.co.kr") ->
     soup = BeautifulSoup(res.text, "html.parser")
 
     selectors_to_try: List[str] = []
-    if SELECTOR_HEADLINES:
+    if selector:
+        selectors_to_try.append(selector)
+    elif SELECTOR_HEADLINES:
         selectors_to_try.append(SELECTOR_HEADLINES)
     selectors_to_try.extend(DEFAULT_FALLBACK_SELECTORS)
 
     seen = set()
     headlines: List[str] = []
     for css in selectors_to_try:
-        for a in soup.select(css):
-            text = _clean_text(a.get_text(" ", strip=True))
+        for el in soup.select(css):
+            text = _clean_text(el.get_text(" ", strip=True))
             # 너무 짧은 텍스트/공백/중복 제거
             if len(text) < 5 or text in seen:
                 continue
@@ -103,8 +112,8 @@ def fetch_kbs_headlines(limit: int = 10, url: str = "https://news.kbs.co.kr") ->
 
     if not headlines:
         raise RuntimeError(
-            "헤드라인을 찾지 못했습니다. 브라우저 DevTools로 실제 기사 제목 <a>의 셀렉터를 확인해 "
-            "SELECTOR_HEADLINES 값을 지정해 보세요."
+            "헤드라인을 찾지 못했습니다. 브라우저 DevTools로 실제 기사 제목 요소(<p> 등)의 셀렉터를 확인해 "
+            "--selector 옵션이나 SELECTOR_HEADLINES 값으로 지정해 보세요."
         )
     return headlines
 
@@ -150,7 +159,7 @@ def fetch_weather_seoul() -> List[str]:
 # 3) 주식 (Google Finance 페이지 파싱, BeautifulSoup + 정규식)
 # -----------------------------
 
-_PRICE_RE = re.compile(r"(?:₩|KRW)?\s?[\d,]+(?:\.\d+)?")
+_PRICE_RE = re.compile(r"(?:₩|KRW)?\\s?[\\d,]+(?:\\.\\d+)?")
 
 def fetch_stock_price(symbol: str = "005930:KRX") -> List[str]:
     """
@@ -168,7 +177,7 @@ def fetch_stock_price(symbol: str = "005930:KRX") -> List[str]:
 
     text = soup.get_text(" ", strip=True)
     # 첫 번째 '₩xx,xxx' 형태를 우선 사용
-    m = re.search(r"₩\s?[\d,]+(?:\.\d+)?", text)
+    m = re.search(r"₩\\s?[\\d,]+(?:\\.\\d+)?", text)
     price = m.group(0) if m else None
 
     # 보조 정보: 전일 종가, 일중/52주 범위 등도 흔히 페이지에 텍스트로 포함됨
@@ -217,9 +226,9 @@ def fetch_stock_price(symbol: str = "005930:KRX") -> List[str]:
 # -----------------------------
 
 def print_list(title: str, items: List[str]) -> None:
-    print(f"\n[{title}] ({len(items)}개)\n" + "-" * 60)
+    print(f"\\n[{title}] ({len(items)}개)\\n" + "-" * 60)
     for i, v in enumerate(items, 1):
-        print(f"{i:2d}. {v}")
+         print(f"{i:2d}. {v}")
 
 
 # -----------------------------
@@ -237,6 +246,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     pk = sub.add_parser("kbs", help="KBS 헤드라인 가져오기 (BeautifulSoup)")
     pk.add_argument("--limit", type=int, default=10, help="가져올 기사 수 (기본 10)")
     pk.add_argument("--url", type=str, default="https://news.kbs.co.kr", help="수집 대상 URL")
+    pk.add_argument("--selector", type=str, default=None, help="헤드라인 텍스트 요소의 CSS 셀렉터 (예: 'p.tit, .headline p')")
 
     # weather
     pw = sub.add_parser("weather", help="서울 현재 날씨(Open‑Meteo)")
@@ -253,7 +263,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     try:
         if args.command == "kbs":
-            headlines = fetch_kbs_headlines(limit=args.limit, url=args.url)
+            headlines = fetch_kbs_headlines(limit=args.limit, url=args.url, selector=args.selector)
             print_list("KBS 주요 헤드라인", headlines)
         elif args.command == "weather":
             w = fetch_weather_seoul()
