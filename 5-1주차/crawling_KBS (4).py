@@ -43,6 +43,8 @@ import sys
 import time
 import argparse
 from typing import List, Optional
+import time, random
+from selenium.webdriver.common.keys import Keys
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -53,6 +55,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 
+USER_ID = 'do_hh'
+USER_PW = 'kimdohyun@1'
 
 NAVER_HOME = "https://www.naver.com/"
 NAVER_LOGIN = "https://nid.naver.com/nidlogin.login"
@@ -95,6 +99,25 @@ def safe_get(driver: webdriver.Chrome, url: str, timeout: int = 60):
     driver.set_page_load_timeout(timeout)
     driver.get(url)
 
+def smart_clear(el, is_mac=True):
+    """입력창을 안전하게 초기화 (전체선택+삭제)"""
+    el.click()
+    if is_mac:
+        el.send_keys(Keys.COMMAND, 'a')
+    else:
+        el.send_keys(Keys.CONTROL, 'a')
+    el.send_keys(Keys.DELETE)
+    time.sleep(0.15)
+
+def human_type(el, text, min_s=0.07, max_s=0.18, punc_pause=(0.25, 0.5)):
+    """문자를 하나씩 보내며 랜덤 간격으로 '사람처럼' 타이핑"""
+    for ch in text:
+        el.send_keys(ch)
+        if ch in ",.?!:;":
+            time.sleep(random.uniform(*punc_pause))
+        else:
+            time.sleep(random.uniform(min_s, max_s))    
+
 def is_logged_in(driver: webdriver.Chrome) -> bool:
     """네이버 홈에서 로그인 상태를 추정."""
     try:
@@ -133,12 +156,15 @@ def do_login(driver: webdriver.Chrome, user_id: str, user_pw: str, pause_after_l
     if not id_box or not pw_box:
         raise RuntimeError("로그인 입력창을 찾을 수 없습니다. 셀렉터를 업데이트 하세요.")
 
-    id_box.clear()
-    id_box.send_keys(user_id)
-    time.sleep(2)
-    pw_box.clear()
-    pw_box.send_keys(user_pw)
-    time.sleep(2)
+    # ID
+    smart_clear(id_box, is_mac=True)
+    human_type(id_box, user_id)          # ← 사람처럼 타이핑
+
+    # PW
+    smart_clear(pw_box, is_mac=True)
+    human_type(pw_box, user_pw)          # ← 사람처럼 타이핑
+
+    time.sleep(2)  # 서버 반응/렌더링 여유
 
     # 로그인 버튼 클릭
     # 과거: #log.login 또는 button[type='submit']
